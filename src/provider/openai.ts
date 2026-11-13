@@ -313,8 +313,11 @@ export function createOpenAIProvider(options: OpenAIProviderOptions): Provider {
               if (call.name) current.name = call.name;
               if (call.args) current.args += call.args;
               pending.set(call.index, current);
-              // A tool with no arguments streams nothing after its name.
-              if (current.name && !current.args) flush(call.index);
+              // Do NOT flush on "name arrived, arguments still empty": the
+              // OpenAI wire format sends the name first and streams arguments
+              // in later chunks, so an early flush would emit `{}` and discard
+              // the real arguments. Calls are flushed at finish_reason and at
+              // end of stream, which also covers argument-less tools.
             }
           }
 

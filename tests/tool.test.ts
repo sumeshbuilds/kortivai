@@ -453,6 +453,13 @@ test("todowrite renders a checklist and todoread returns it per session", async 
   assert.ok(invalid.output.includes('field "todos[0].status"'), invalid.output);
 });
 
+test("todoread is refused when a policy rule denies it", async () => {
+  const permission = createPermissionManager({ rules: [{ tool: "todoread", action: "deny" }] });
+  const outcome = await registry().execute("todoread", {}, ctx(permission));
+  assert.equal(outcome.isError, true);
+  assert.equal(outcome.metadata?.["denied"], true);
+});
+
 /* ------------------------------------------------------------------ *
  * bash (gating only: piped child stdio is unavailable in this sandbox)
  * ------------------------------------------------------------------ */

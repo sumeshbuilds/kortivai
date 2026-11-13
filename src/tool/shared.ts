@@ -8,7 +8,6 @@ import { promises as fs } from "node:fs";
 import { dirname, join } from "node:path";
 import { diffLines } from "diff";
 import type { PermissionRequest, ToolContext, ToolOutcome } from "../core/types.ts";
-import { errorMessage } from "../util/errors.ts";
 import { assertInside, isInside, relativeTo } from "../util/paths.ts";
 
 /** Long lines are cut so one minified file cannot flood the transcript. */
@@ -48,10 +47,6 @@ export interface GateRequest {
 /** Builds a non-throwing error outcome so the model sees a readable reason. */
 export function fail(message: string, metadata?: Record<string, unknown>): ToolOutcome {
   return metadata ? { output: message, isError: true, metadata } : { output: message, isError: true };
-}
-
-export function errorOutcome(error: unknown): ToolOutcome {
-  return { output: errorMessage(error), isError: true };
 }
 
 /** True when the caller aborted before we did anything observable. */

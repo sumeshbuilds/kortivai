@@ -2,6 +2,7 @@ import test, { after, before } from "node:test";
 import assert from "node:assert/strict";
 import { mkdirSync, mkdtempSync, rmSync } from "node:fs";
 import { join, resolve } from "node:path";
+import { Readable } from "node:stream";
 import { parseArgs } from "../src/cli/args.ts";
 import { memoryIo } from "../src/cli/io.ts";
 import { KortivError } from "../src/util/errors.ts";

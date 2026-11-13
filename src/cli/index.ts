@@ -172,10 +172,10 @@ export async function main(argv: string[], io: CliIo = createIo()): Promise<numb
     const helpTopic =
       parsed.command === "help"
         ? parsed.positionals[0]
-        : parsed.flags.help === true
+        : parsed.flags.help === true && parsed.command !== "tui"
           ? parsed.command
           : undefined;
-    if (helpTopic !== undefined || parsed.command === "help") {
+    if (parsed.flags.help === true || parsed.command === "help") {
       io.stdout.write(`${renderHelp(helpTopic)}\n`);
       return 0;
     }

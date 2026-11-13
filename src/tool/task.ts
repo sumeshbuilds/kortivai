@@ -32,7 +32,9 @@ export const taskTool: ToolDef = {
     "delegate work you could finish with a single read or grep. The subagent's own tool calls are permissioned " +
     "separately, and it cannot ask you follow-up questions.",
   parameters: PARAMETERS,
-  // Side effects happen inside the subagent, whose tools gate themselves.
+  // Not permission-gated here: the subagent's own tools each gate themselves
+  // under that session's policy, and delegating is not itself a workspace
+  // side effect.
   async execute(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutcome> {
     const agent = input["agent"];
     const prompt = input["prompt"];

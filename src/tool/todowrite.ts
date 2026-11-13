@@ -79,7 +79,8 @@ export const todowriteTool: ToolDef = {
     "done, and use `cancelled` for work you abandoned. Use it for multi-step work (3+ steps) and skip it for trivial " +
     "requests. Never use it as a substitute for doing the work.",
   parameters: PARAMETERS,
-  // Not `destructive`: it only touches this session's in-memory checklist.
+  // Not `destructive`, and intentionally not permission-gated: it only
+  // touches this session's in-memory checklist, never the workspace.
   async execute(input: Record<string, unknown>, ctx: ToolContext): Promise<ToolOutcome> {
     const raw = input["todos"];
     if (!Array.isArray(raw)) {

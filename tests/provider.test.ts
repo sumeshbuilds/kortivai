@@ -275,6 +275,36 @@ test("tool-call arguments accumulate across deltas and parse at flush", async ()
   assert.equal(lastFinish(events)?.reason, "tool-calls");
 });
 
+test("tool-call arguments accumulate when the name arrives before any arguments", async () => {
+  // This is the exact shape DeepSeek and OpenAI stream in practice: the name
+  // arrives in its own chunk with empty arguments, and the argument text
+  // follows in later chunks. Flushing on "name seen" emitted `{}` and dropped
+  // every real argument, which made every tool call fail validation live.
+  const chunks = [
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_1","type":"function","function":{"name":"read","arguments":""}}]}}]}\n\n',
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"{\\"filePa"}}]}}]}\n\n',
+    'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"function":{"arguments":"th\\":\\"src/a.ts\\"}"}}]}}]}\n\n',
+    'data: {"choices":[{"delta":{},"finish_reason":"tool_calls"}]}\n\n',
+    "data: [DONE]\n\n",
+  ];
+  const { impl } = fakeFetch(streamResponse(chunks));
+  const provider = createOpenAIProvider({
+    info: { id: "deepseek", name: "DeepSeek", env: [], baseURL: "https://api.deepseek.com", models: [] },
+    baseURL: "https://api.deepseek.com",
+    apiKey: "k",
+    fetchImpl: impl,
+  });
+  const events: StreamEvent[] = [];
+  await provider.chat(requestFor("deepseek", "deepseek-chat", events));
+
+  const calls = events.filter(
+    (event): event is Extract<StreamEvent, { type: "tool-call" }> => event.type === "tool-call",
+  );
+  assert.equal(calls.length, 1, "the call must be emitted once, not once per delta");
+  assert.equal(calls[0]!.name, "read");
+  assert.deepEqual(calls[0]!.input, { filePath: "src/a.ts" });
+});
+
 test("a complete tool call with empty arguments is emitted exactly once", async () => {
   const chunks = [
     'data: {"choices":[{"delta":{"tool_calls":[{"index":0,"id":"call_9","function":{"name":"git_status","arguments":""}}]}}]}\n\n',

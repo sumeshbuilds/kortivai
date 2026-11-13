@@ -75,24 +75,58 @@ test(
       assert.match(fixed, /return a \* b;/, "the unrelated function was modified");
 
       // The transcript must show the agent actually used tools, not just talked.
-      const toolEvents = message.parts.filter((part) => part.type === "tool");
-      assert.ok(
-        toolEvents.length > 0,
-        `expected the agent to call tools, got parts: ${message.parts.map((p) => p.type).join(",")}`,
+      // Tool calls may land in earlier assistant messages, so inspect the whole
+      // persisted session rather than only the final message.
+      const history = await runtime.sessions.messages(session.id);
+      const toolParts = history.flatMap((entry) =>
+        entry.parts.filter((part) => part.type === "tool"),
       );
-      for (const part of toolEvents) {
-        if (part.type === "tool") {
-          assert.notEqual(part.status, "error", `tool ${part.name} failed: ${part.error ?? ""}`);
+      assert.ok(
+        toolParts.length > 0,
+        `expected the agent to call tools, got: ${history
+          .map((entry) => entry.parts.map((part) => part.type).join("+"))
+          .join(" | ")}`,
+      );
+      // File-mutating and reading tools must all succeed. `bash` is allowed to
+      // fail only for the documented sandbox limitation (a piped child process
+      // is refused with EPERM here); any other failure is a real defect.
+      const sandboxBash = new Set<string>();
+      for (const part of toolParts) {
+        if (part.type !== "tool") continue;
+        if (part.status === "error") {
+          const isSandboxSpawn = part.name === "bash" && /EPERM/i.test(part.error ?? "");
+          if (isSandboxSpawn) {
+            sandboxBash.add(part.name);
+            continue;
+          }
+          assert.fail(`tool ${part.name} failed: ${part.error ?? ""}`);
         }
+        assert.equal(part.status, "completed", `tool ${part.name} ended as ${part.status}`);
+      }
+      assert.ok(
+        toolParts.some((part) => part.type === "tool" && part.name === "edit"),
+        `expected an edit call, saw: ${toolParts.map((part) => (part.type === "tool" ? part.name : "")).join(",")}`,
+      );
+      if (sandboxBash.size > 0) {
+        console.log("note: bash could not spawn in this sandbox (EPERM); file edits ran normally.");
       }
 
       // Session state must be durable, not just in memory.
       const persisted = await runtime.sessions.get(session.id);
       assert.ok(persisted, "the session must be persisted to disk");
-      const messages = await runtime.sessions.messages(session.id);
-      assert.ok(messages.length >= 2, "the session must contain the user turn and the assistant turn");
+      assert.ok(history.length >= 2, "the session must contain the user turn and the assistant turn");
+      assert.ok(!message.error, `the final message reported an error: ${message.error ?? ""}`);
 
-      const answer = texts.join("");
+      const answer = history
+        .filter((entry) => entry.role === "assistant")
+        .map((entry) =>
+          entry.parts
+            .filter((part): part is Extract<typeof part, { type: "text" }> => part.type === "text")
+            .map((part) => part.text)
+            .join(""),
+        )
+        .filter((text) => text.trim().length > 0)
+        .join("\n\n");
       assert.ok(answer.trim().length > 0, "the agent produced no text output");
       console.log(`\n--- live agent output ---\n${answer.trim()}\n-------------------------\n`);
     } finally {
