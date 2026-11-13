@@ -1,5 +1,5 @@
 /** Working-directory file discovery used by `@path` completion. */
-import { readdirSync } from "node:fs";
+import { readdirSync, type Dirent } from "node:fs";
 import { join, relative, sep } from "node:path";
 
 const DEFAULT_IGNORES = new Set([
@@ -32,7 +32,7 @@ export function walkFiles(root: string, options: WalkOptions = {}): string[] {
 
   while (queue.length > 0 && out.length < limit) {
     const current = queue.shift()!;
-    let entries: ReturnType<typeof readdirSync>;
+    let entries: Dirent[];
     try {
       entries = readdirSync(current.dir, { withFileTypes: true });
     } catch {

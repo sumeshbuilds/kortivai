@@ -33,11 +33,12 @@ const FLAG_SPECS: FlagSpec[] = [
   { name: "debug", key: "debug", type: "boolean" },
   { name: "json", key: "json", type: "boolean" },
   { name: "quiet", key: "quiet", type: "boolean" },
+  { name: "force", key: "force", type: "boolean" },
 ];
 
 const HELP_HINT = "Run `kortivai --help` to see available options.";
 
-export const COMMANDS = ["run", "models", "sessions", "agents", "help", "tui", "version"] as const;
+export const COMMANDS = ["run", "models", "sessions", "agents", "init", "help", "tui", "version"] as const;
 
 function unknownFlag(flag: string): KortivError {
   return new KortivError(`Unknown option "${flag}".`, { hint: HELP_HINT });

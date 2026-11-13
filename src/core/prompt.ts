@@ -1,4 +1,5 @@
-import { join, relative, resolve } from "node:path";
+﻿import { join, relative, resolve } from "node:path";
+import { homedir } from "node:os";
 import { readdir, readFile } from "node:fs/promises";
 import { exists, readTextOrNull } from "../util/fsx.ts";
 import { findUp, projectRoot, toPosix } from "../util/paths.ts";
@@ -69,6 +70,44 @@ export interface LoadedInstruction {
 }
 
 /**
+ * Walks from `cwd` up to the repository root (or, outside a repo, no higher
+ * than the user's home) collecting every `AGENTS.md` on the way. Returned
+ * root-first so nested files are appended later and win by position.
+ */
+async function discoverInstructionChain(cwd: string): Promise<string[]> {
+  const home = resolve(homedir());
+  const gitRoot = await findGitRoot(cwd);
+  const chain: string[] = [];
+  let current = resolve(cwd);
+
+  for (let depth = 0; depth < 24; depth += 1) {
+    for (const name of ["AGENTS.md", "KORTIVAI.md"]) {
+      const candidate = join(current, name);
+      if (await exists(candidate)) chain.push(candidate);
+    }
+    if (gitRoot && current === gitRoot) break;
+    const parent = resolve(current, "..");
+    if (parent === current) break;
+    // Never escape above the user's home directory: a stray AGENTS.md in an
+    // unrelated ancestor must not become this project's rules.
+    if (!gitRoot && (current === home || !parent.startsWith(home))) break;
+    current = parent;
+  }
+
+  return chain.reverse();
+}
+
+async function findGitRoot(cwd: string): Promise<string | undefined> {
+  let dir = resolve(cwd);
+  for (;;) {
+    if (await exists(join(dir, ".git"))) return dir;
+    const parent = resolve(dir, "..");
+    if (parent === dir) return undefined;
+    dir = parent;
+  }
+}
+
+/**
  * Discovers `AGENTS.md` from the project root down to the working directory.
  * Nested files are appended after the root file so the most specific
  * instructions win by position. `KORTIVAI.md` is accepted as an alias.
@@ -89,28 +128,7 @@ export async function loadAgentInstructions(
   };
 
   if (!config.disableAgentsMd) {
-    const root = projectRoot(cwd);
-    const nearest = findUp(["AGENTS.md", "KORTIVAI.md"], cwd);
-    const chain: string[] = [];
-    if (nearest) {
-      let current = resolve(nearest);
-      const stop = resolve(root);
-      for (;;) {
-        chain.unshift(current);
-        const parent = resolve(current, "..");
-        if (current === stop || parent === current) break;
-        current = parent;
-      }
-    }
-    for (const path of chain) await push(path);
-
-    // Also accept the alias alongside AGENTS.md at the root.
-    if (!nearest) {
-      for (const name of ["AGENTS.md", "KORTIVAI.md"]) {
-        const candidate = join(root, name);
-        if (await exists(candidate)) await push(candidate);
-      }
-    }
+    for (const path of await discoverInstructionChain(cwd)) await push(path);
   }
 
   for (const extra of config.instructions ?? []) {
@@ -153,8 +171,8 @@ export interface ComposePromptInput {
 }
 
 /**
- * Composes the final system prompt: base (or user override) → agent prompt →
- * environment → project instructions → skills.
+ * Composes the final system prompt: base (or user override) â†’ agent prompt â†’
+ * environment â†’ project instructions â†’ skills.
  */
 export function composeSystemPrompt(input: ComposePromptInput): string {
   const { agent, config, environment, instructions, skills = [] } = input;

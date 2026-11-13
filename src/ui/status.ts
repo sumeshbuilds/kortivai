@@ -26,16 +26,27 @@ export function agentToken(agent: string): "info" | "accent" {
 
 /** `~`-shortened, tail-truncated path for one-line chrome. */
 export function shortenPath(path: string, home?: string): string {
-  let out = path;
-  const normalizedHome = home?.replace(/\\/g, "/").replace(/\/+$/, "");
+  // Normalise separators first: on Windows a backslash path contains no "/",
+  // so truncation silently treated the whole path as a single segment.
   const normalized = path.replace(/\\/g, "/");
+  const normalizedHome = home?.replace(/\\/g, "/").replace(/\/+$/, "");
+  let out = normalized;
   if (normalizedHome && normalized.toLowerCase().startsWith(normalizedHome.toLowerCase())) {
     out = `~${normalized.slice(normalizedHome.length)}`;
   }
   if (displayWidth(out) <= 44) return out;
-  const parts = out.split("/");
-  while (parts.length > 3 && displayWidth(parts.join("/")) > 44) parts.shift();
-  return `…/${parts.join("/")}`;
+  // Keep the tail, since that is what identifies the directory. A Windows
+  // drive letter is dropped because ".../C:/Users/x" reads as broken chrome.
+  const segments = out
+    .split("/")
+    .filter((segment) => segment.length > 0 && !/^[A-Za-z]:$/.test(segment));
+  let tail = "";
+  for (let index = segments.length - 1; index >= 0; index -= 1) {
+    const candidate = `…/${segments[index] ?? ""}${tail}`;
+    if (displayWidth(candidate) > 44) break;
+    tail = `/${segments[index] ?? ""}${tail}`;
+  }
+  return tail === "" ? `…/${segments.at(-1) ?? ""}` : `…${tail}`;
 }
 
 export function renderPromptPrefix(info: Pick<StatusInfo, "agent" | "busy" | "cancelling">, theme: Theme): string {

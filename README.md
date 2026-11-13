@@ -82,11 +82,18 @@ kortivai "fix the failing test in src/cart.test.ts"
 kortivai run "add a --json flag to the export command"   # headless, scriptable
 ```
 
-Inside the interactive UI, `Tab` switches agent, `Ctrl+C` cancels a running
-turn, `Ctrl+D` exits, and `@path/to/file` attaches a file to your message.
+Inside the interactive UI, `Tab` completes slash commands and `@path/to/file`
+mentions, `Ctrl+C` cancels a running turn (press it twice quickly to exit),
+`Ctrl+D` exits, and `@path/to/file` attaches that file's contents to your
+message so the model does not spend a tool round-trip finding it.
 
 Slash commands: `/help /model /agent /new /sessions /resume /mcp /skills
 /agents /init /clear /compact /exit`.
+
+The model comes from `kortivai.json`, `KORTIVAI_MODEL`, or `--model`. With none
+of those set, KortivAI picks `deepseek/deepseek-chat` when a DeepSeek key is
+present, otherwise the first provider you do have a credential for — so a fresh
+install works without a config file.
 
 ### 3. Teach it your project
 
@@ -333,6 +340,24 @@ KORTIVAI_LIVE_TEST=1 DEEPSEEK_API_KEY=sk-... \
 It writes a file with a real bug, asks a real model to fix it, and then
 verifies the fix from outside the agent — the full chain: provider transport,
 agent loop, tool execution, permissions, and session persistence.
+
+### What has actually been verified
+
+Stated plainly, because "it works" is easy to overclaim:
+
+| Claim | How it was checked |
+| --- | --- |
+| 196 unit + integration tests pass | `npm test` (2 live tests skip without a key) |
+| `tsc` accepts the whole tree | `npm run typecheck` and `npm run build` |
+| A real model fixes a real bug via real tools | the live test above, against DeepSeek |
+| The agent works from the shipped CLI | `kortivai run "..."` fixed a failing test in a scratch project; the project's own test then passed |
+| Writes are gated when nobody can approve them | non-interactive run with a write prompt: denied, file untouched, no hang |
+| The interactive TUI runs a turn end to end | driven with a scripted pseudo-TTY: banner, slash commands, a real edit, `/exit` summary |
+| `@path` attachment reaches the model | the model answered a codeword that existed only inside the attached file |
+
+Known environment limits: a sandbox that forbids child processes with captured
+output will block the `bash` tool. KortivAI reports that clearly rather than
+retrying, and the remaining tools keep working.
 
 ---
 

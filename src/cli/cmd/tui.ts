@@ -5,6 +5,7 @@
  * renderers and transcript are all pure and tested separately. This file
  * wires them to the runtime and owns the terminal lifecycle.
  */
+import { readFileSync } from "node:fs";
 import type {
   AgentEvent,
   ModelRef,
@@ -17,7 +18,6 @@ import type {
 import { accumulateUsage, textOf } from "../../core/agent.ts";
 import type { KortivRuntime } from "../../core/wiring.ts";
 import { KortivError, errorMessage } from "../../util/errors.ts";
-import { homeDir } from "../../util/paths.ts";
 import { createEditorState, reduceEditor, type EditorKey, type EditorState } from "../../ui/editor.ts";
 import { complete, renderCompletionList, SLASH_COMMANDS, tokenAt } from "../../ui/completion.ts";
 import { decidePermission, renderPermissionPrompt } from "../../ui/permission.ts";
@@ -30,6 +30,7 @@ import {
   type StatusInfo,
 } from "../../ui/status.ts";
 import { renderTable } from "../../ui/table.ts";
+import { collectAttachments, withAttachments } from "../mentions.ts";
 import { createTheme, displayWidth, resolveThemeName, type Theme } from "../../ui/theme.ts";
 import {
   Transcript,
@@ -266,6 +267,7 @@ class Shell {
     this.permissionResolve = undefined;
     this.mode = "busy";
     this.io.stdout.write("\n");
+    if (this.status.busy) this.startSpinner();
     resolve?.(decision);
   }
 
@@ -328,9 +330,17 @@ class Shell {
     this.status = { ...this.status, busy: true, cancelling: false };
     this.startSpinner();
     try {
+      // `@path` mentions become attached file content, so the model does not
+      // have to spend a tool round-trip discovering what the user pointed at.
+      const attachments = await collectAttachments(prompt, this.runtime.config.cwd);
+      if (attachments.length > 0) {
+        this.note(
+          attachments.map((attachment) => `attached ${attachment.path}`).join(", "),
+        );
+      }
       const message = await this.runtime.agents.run({
         sessionId: this.session.id,
-        prompt,
+        prompt: withAttachments(prompt, attachments),
         agent: this.status.agent,
         model: this.modelRef(),
       });
@@ -644,7 +654,7 @@ class Shell {
 
   private askPermission(request: PermissionRequest): Promise<PermissionDecision> {
     return new Promise<PermissionDecision>((resolve) => {
-      this.stopSpinnerLine();
+      this.stopSpinner();
       this.mode = "permission";
       this.transcript.notePermissionShown(request);
       this.permissionResolve = (decision) => resolve(decision);
@@ -672,10 +682,6 @@ class Shell {
     tick();
     this.spinner = setInterval(tick, 100);
     this.spinner.unref?.();
-  }
-
-  private stopSpinnerLine(): void {
-    if (this.spinner) this.io.stdout.write(CLEAR_LINE);
   }
 
   private stopSpinner(): void {
@@ -730,7 +736,7 @@ function visibleWindow(buffer: string, cursor: number, room: number): { text: st
 function version(): string {
   try {
     const url = new URL("../../../package.json", import.meta.url);
-    const parsed = JSON.parse(require("node:fs").readFileSync(url, "utf8")) as { version?: string };
+    const parsed = JSON.parse(readFileSync(url, "utf8")) as { version?: string };
     return parsed.version ?? "0.0.0";
   } catch {
     return "0.0.0";

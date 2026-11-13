@@ -71,16 +71,21 @@ export function complete(prefix: string, context: CompletionContext = {}): Compl
 
   if (prefix.startsWith("/") && !prefix.includes(" ")) {
     const matches = commands.map((command) => command.name).filter((name) => name.startsWith(prefix));
-    return { matches, replacement: pick(prefix, matches) };
+    return finish(prefix, matches);
   }
 
   if (prefix.startsWith("@")) {
     const query = prefix.slice(1);
     const matches = matchFiles(query, context.files ?? []).map((file) => `@${file}`);
-    return { matches, replacement: pick(prefix, matches) };
+    return finish(prefix, matches);
   }
 
   return { matches: [] };
+}
+
+function finish(prefix: string, matches: string[]): CompletionResult {
+  const replacement = pick(prefix, matches);
+  return replacement === undefined ? { matches } : { matches, replacement };
 }
 
 /** One match completes outright; several complete as far as they agree. */

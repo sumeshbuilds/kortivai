@@ -14,6 +14,8 @@ import { runCommand } from "./cmd/run.ts";
 import { modelsCommand } from "./cmd/models.ts";
 import { sessionsCommand } from "./cmd/sessions.ts";
 import { agentsCommand } from "./cmd/agents.ts";
+import { initCommand } from "./cmd/init.ts";
+import { tuiCommand } from "./cmd/tui.ts";
 
 export function packageVersion(): string {
   try {
@@ -67,6 +69,12 @@ const COMMAND_HELP: Record<string, CommandHelp> = {
     usage: "kortivai agents [--json]",
     examples: ["kortivai agents"],
   },
+  init: {
+    summary: "Write a commented kortivai.json and an AGENTS.md starter.",
+    usage: "kortivai init [--force]",
+    options: ["    --force                    overwrite files that already exist"],
+    examples: ["kortivai init"],
+  },
   tui: {
     summary: "Start the interactive terminal UI.",
     usage: "kortivai [tui]",
@@ -108,6 +116,7 @@ export function renderHelp(command?: string): string {
     "  models      Providers, models, context windows, credential status",
     "  sessions    List saved sessions, or remove one",
     "  agents      List the agents available to --agent",
+    "  init        Write kortivai.json and AGENTS.md into this project",
     "  help        Show help for a command",
     "",
     "OPTIONS",
@@ -189,12 +198,12 @@ export async function main(argv: string[], io: CliIo = createIo()): Promise<numb
         return await sessionsCommand(ctx);
       case "agents":
         return await agentsCommand(ctx);
+      case "init":
+        return await initCommand(ctx);
       case "tui":
         // A piped stdin falls back to a headless one-shot so scripts never hang.
-        if (!io.stdinIsTTY) return await runCommand(ctx);
-        throw new KortivError("The interactive TUI is not available in this build yet.", {
-          hint: 'Use `kortivai run "<prompt>"` for a one-shot turn.',
-        });
+        if (!io.stdinIsTTY || !io.stdoutIsTTY) return await runCommand(ctx);
+        return await tuiCommand(ctx);
       default:
         throw new KortivError(`Unknown command "${parsed.command}".`, {
           hint: "Run `kortivai --help` to see available commands.",

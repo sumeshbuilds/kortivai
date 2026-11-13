@@ -6,17 +6,22 @@ export type LogLevel = "debug" | "info" | "warn" | "error";
 
 const LEVEL_ORDER: Record<LogLevel, number> = { debug: 10, info: 20, warn: 30, error: 40 };
 
-/** Secrets must never reach a log file, even when a user pastes a key. */
+/**
+ * Secrets must never reach a log file. Order matters: whole-header patterns run
+ * first, because the generic key/value rule would otherwise redact the scheme
+ * word (`Bearer`) and leave the actual token exposed next to it.
+ */
 const REDACTIONS: Array<{ pattern: RegExp; replacement: string }> = [
+  { pattern: /(\bauthorization\b\s*[:=]\s*)([^\r\n]+)/gi, replacement: "$1<redacted>" },
+  { pattern: /(\bbearer\s+)([A-Za-z0-9._~+/=-]{8,})/gi, replacement: "$1<redacted>" },
   { pattern: /\b(sk-[A-Za-z0-9_-]{8,})/g, replacement: "<redacted>" },
   { pattern: /\b(nvapi-[A-Za-z0-9_-]{8,})/g, replacement: "<redacted>" },
   { pattern: /\b(oc_sk_[A-Za-z0-9_-]{8,})/g, replacement: "<redacted>" },
   { pattern: /\b(thk_live_[A-Za-z0-9_-]{8,})/g, replacement: "<redacted>" },
   {
-    pattern: /("?(?:api[_-]?key|authorization|token|secret)"?\s*[:=]\s*"?)([^"\s,}]{6,})/gi,
-    replacement: "$1<redacted>",
+    pattern: /("?(?:api[_-]?key|token|secret|password|access[_-]?key)"?\s*[:=]\s*)("?)([^"\r\n,}]{6,})\2/gi,
+    replacement: "$1$2<redacted>$2",
   },
-  { pattern: /(Bearer\s+)([A-Za-z0-9._-]{8,})/g, replacement: "$1<redacted>" },
 ];
 
 export function redact(input: string): string {
