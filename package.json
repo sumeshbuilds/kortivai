@@ -26,8 +26,8 @@
     "dev": "node src/cli/index.ts",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
-    "test": "node --experimental-test-isolation=none --test tests/",
-    "test:e2e": "node --experimental-test-isolation=none --test tests/e2e/",
+    "test": "node --experimental-test-isolation=none --test \"tests/**/*.test.ts\"",
+    "test:e2e": "node --experimental-test-isolation=none --test \"tests/e2e/**/*.test.ts\"",
     "verify": "npm run typecheck && npm run test && npm run build",
     "start": "node dist/cli/index.js"
   },

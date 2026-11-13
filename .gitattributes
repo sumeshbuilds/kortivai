@@ -1,0 +1,15 @@
+# Normalize line endings so the repo behaves the same on Windows and POSIX.
+* text=auto eol=lf
+
+# Windows-only helpers keep CRLF.
+*.ps1 text eol=crlf
+*.cmd text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets are never line-ending-converted.
+*.png binary
+*.jpg binary
+*.webp binary
+
+# Keep generated/locked files out of diffs.
+package-lock.json linguist-generated=true

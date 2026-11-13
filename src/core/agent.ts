@@ -396,6 +396,10 @@ export function createAgentRuntime(options: AgentRuntimeOptions): AgentRuntimeHo
     let usage: Usage | undefined;
     let finishReason: FinishReason = "unknown";
     let streamError: string | undefined;
+    // Providers report whether a failure is worth retrying; an error the model
+    // endpoint considers permanent must not be retried, or we burn the script
+    // and silently return a stale turn.
+    let streamErrorRetryable = false;
 
     const params: { system: string; temperature?: number; maxTokens?: number } = {
       system,
@@ -458,6 +462,7 @@ export function createAgentRuntime(options: AgentRuntimeOptions): AgentRuntimeHo
           break;
         case "error":
           streamError = event.error;
+          streamErrorRetryable = event.retryable;
           break;
         default:
           break;
@@ -466,6 +471,7 @@ export function createAgentRuntime(options: AgentRuntimeOptions): AgentRuntimeHo
 
     for (let attempt = 1; ; attempt += 1) {
       streamError = undefined;
+      streamErrorRetryable = false;
       try {
         await provider.chat({
           model,
@@ -477,7 +483,11 @@ export function createAgentRuntime(options: AgentRuntimeOptions): AgentRuntimeHo
           onEvent,
           signal,
         });
-        if (streamError) throw new ProviderError(model.provider, streamError, { retryable: true });
+        if (streamError) {
+          throw new ProviderError(model.provider, streamError, {
+            retryable: streamErrorRetryable,
+          });
+        }
         break;
       } catch (error) {
         if (isAbortError(error) || signal.aborted) {
@@ -786,13 +796,23 @@ export function createAgentRuntime(options: AgentRuntimeOptions): AgentRuntimeHo
       };
       await sessions.append(session.id, notice);
       emit({
+        type: "message.start",
+        sessionId: session.id,
+        messageId: notice.id,
+        role: "assistant",
+      });
+      emit({
         type: "message.end",
         sessionId: session.id,
         messageId: notice.id,
         message: notice,
       });
+      session.updatedAt = Date.now();
+      await sessions.save(session);
       emit({ type: "session.end", sessionId: session.id, reason: "done" });
-      return lastAssistant ?? notice;
+      // Return the notice, not the last tool-call message: the caller needs to
+      // see *why* the turn ended, otherwise a budget stop looks like silence.
+      return notice;
     } catch (error) {
       const text = errorMessage(error);
       if (isAbortError(error)) {

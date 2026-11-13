@@ -235,6 +235,15 @@ export async function createHarness(options: HarnessOptions): Promise<Harness> {
     rules: options.config?.permissions ?? [],
     asker,
     autoApprove: options.autoApprove ?? false,
+    // Mirrors src/core/wiring.ts so tests observe the same event contract.
+    onResolved: (request, decision) => {
+      bus.emit({
+        type: "permission.resolved",
+        sessionId: request.sessionId,
+        request,
+        decision,
+      });
+    },
   });
 
   const config: ResolvedConfig = {

@@ -1,9 +1,9 @@
-/**
+﻿/**
  * End-to-end acceptance tests for the KortivAI agent loop.
  *
  * These drive the REAL loop, REAL tool registry, REAL permission manager and
  * REAL session store, with only the model provider scripted. They are the
- * proof that the layers actually compose — unit tests per module cannot show
+ * proof that the layers actually compose â€” unit tests per module cannot show
  * that.
  */
 import { test } from "node:test";
@@ -46,7 +46,7 @@ test("e2e: a text-only turn streams, persists and reports usage", async () => {
 test("e2e: the agent writes a file through the real write tool", async () => {
   const harness = await createHarness({
     turns: [
-      { toolCalls: [{ name: "write", input: { path: "out/hello.txt", content: "from the agent\n" } }] },
+      { toolCalls: [{ name: "write", input: { filePath: "out/hello.txt", content: "from the agent\n" } }] },
       { text: "Wrote out/hello.txt." },
     ],
   });
@@ -85,13 +85,13 @@ test("e2e: the agent writes a file through the real write tool", async () => {
 test("e2e: the agent reads then edits an existing file", async () => {
   const harness = await createHarness({
     turns: [
-      { toolCalls: [{ name: "read", input: { path: "src/app.ts" } }] },
+      { toolCalls: [{ name: "read", input: { filePath: "src/app.ts" } }] },
       {
         toolCalls: [
           {
             name: "edit",
             input: {
-              path: "src/app.ts",
+              filePath: "src/app.ts",
               edits: [{ oldString: "const port = 3000;", newString: "const port = 8080;" }],
             },
           },
@@ -123,7 +123,7 @@ test("e2e: the agent reads then edits an existing file", async () => {
 test("e2e: a denied permission prevents the side effect and reports the block", async () => {
   const harness = await createHarness({
     turns: [
-      { toolCalls: [{ name: "write", input: { path: "secret.txt", content: "should not exist" } }] },
+      { toolCalls: [{ name: "write", input: { filePath: "secret.txt", content: "should not exist" } }] },
       { text: "I was not allowed to write that file." },
     ],
     answers: ["deny"],
@@ -161,7 +161,7 @@ test("e2e: a denied permission prevents the side effect and reports the block", 
 test("e2e: the read-only plan agent cannot write even with auto-approve", async () => {
   const harness = await createHarness({
     turns: [
-      { toolCalls: [{ name: "write", input: { path: "blocked.txt", content: "nope" } }] },
+      { toolCalls: [{ name: "write", input: { filePath: "blocked.txt", content: "nope" } }] },
       { text: "Planning only." },
     ],
     autoApprove: true,
@@ -208,7 +208,7 @@ test("e2e: the step budget stops a runaway tool loop and says so", async () => {
   // The model asks for a read forever; maxSteps must terminate it.
   const harness = await createHarness({
     turns: Array.from({ length: 10 }, () => ({
-      toolCalls: [{ name: "read", input: { path: "loop.txt" } }],
+      toolCalls: [{ name: "read", input: { filePath: "loop.txt" } }],
     })),
     config: { maxSteps: 3 },
   });
