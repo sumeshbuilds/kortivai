@@ -173,7 +173,15 @@ export const bashTool: ToolDef = {
         }
 
         if (spawnError) {
-          resolveOutcome(fail(`Could not run the command: ${spawnError.message}`, { aborted, timedOut }));
+          // An opaque "spawn EPERM" invites the model to retry forever. Name the
+          // likely cause and tell it to stop, so it adapts instead of looping.
+          const code = (spawnError as NodeJS.ErrnoException).code;
+          const blocked =
+            code === "EPERM" || code === "EACCES"
+              ? " The shell could not start: this environment blocks child processes that capture output. " +
+                "Do not retry; finish with the tools that work and state plainly what you could not verify."
+              : "";
+          resolveOutcome(fail(`Could not run the command: ${spawnError.message}.${blocked}`, { aborted, timedOut }));
           return;
         }
 

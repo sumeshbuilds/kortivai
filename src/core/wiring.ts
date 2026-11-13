@@ -11,7 +11,7 @@ import type {
   ToolRegistry,
 } from "./types.ts";
 import { createEventBus } from "./events.ts";
-import { loadConfig, DEFAULT_MAX_STEPS } from "./config.ts";
+import { loadConfig, DEFAULT_MAX_STEPS, DEFAULT_MODEL } from "./config.ts";
 import type { AgentRuntimeHost } from "./agent.ts";
 import { createAgentRuntime } from "./agent.ts";
 import type { SessionStoreExtended } from "./session.ts";
@@ -60,6 +60,26 @@ export interface CreateRuntimeOptions {
 }
 
 /**
+ * Chooses a default model when the user has not named one: the usual default if
+ * its provider has a credential, otherwise the first provider that does. Falls
+ * back to the plain default so the eventual error message can name it.
+ */
+async function pickDefaultModel(
+  providers: ProviderRegistry,
+  logger: Logger,
+): Promise<string> {
+  if (await providers.hasCredential("deepseek")) return DEFAULT_MODEL;
+  for (const info of providers.list()) {
+    if (info.models.length === 0) continue;
+    if (!(await providers.hasCredential(info.id))) continue;
+    const chosen = `${info.id}/${info.models[0]!.id}`;
+    logger.info(`no default-model credential; using ${chosen}`);
+    return chosen;
+  }
+  return DEFAULT_MODEL;
+}
+
+/**
  * Builds the whole object graph once and hands it to a frontend (TUI or
  * headless). Frontends never construct providers, tools or stores directly.
  */
@@ -80,6 +100,14 @@ export async function createKortivRuntime(
     logger: logger.child("provider"),
     fetchImpl: options.fetchImpl,
   });
+
+  // Resolve the default model *after* providers exist, so a user who has a key
+  // for anything at all gets a working setup without writing a config file.
+  // An explicitly configured model is always respected, even if unhealthy.
+  if (!config.model) {
+    config.model = await pickDefaultModel(providers, logger);
+  }
+
   const sessions = createSessionStore({ logger: logger.child("session") });
 
   const permissions = createPermissionManager({

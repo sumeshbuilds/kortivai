@@ -121,6 +121,8 @@ export const configSchema = z
 
 export const DEFAULT_MAX_STEPS = 40;
 export const DEFAULT_TEMPERATURE = 0;
+/** Used when no config, environment variable or flag names a model. */
+export const DEFAULT_MODEL = "deepseek/deepseek-chat";
 
 /** Candidate config files, lowest priority first. */
 export function configCandidates(cwd: string): string[] {
