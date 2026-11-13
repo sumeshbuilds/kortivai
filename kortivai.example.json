@@ -1,0 +1,114 @@
+// KortivAI project configuration — copy to `kortivai.json` and edit.
+//
+// This file is JSON with comments: `//` line comments and trailing commas
+// are accepted. Unknown keys are rejected, so typos surface immediately.
+// Precedence, lowest to highest:
+//   ~/.kortivai/config.json  ->  <project>/kortivai.json  ->  <project>/.kortivai/config.json
+//   ->  KORTIVAI_* environment variables  ->  command-line flags
+{
+  // Default model as provider/model. Run `kortivai models` to see what exists.
+  "model": "deepseek/deepseek-chat",
+
+  // Cheaper model for chores such as session titles.
+  "smallModel": "deepseek/deepseek-chat",
+
+  // 0 is the right default for a coding agent. Raise it only for brainstorming.
+  "temperature": 0,
+
+  // Maximum provider round-trips per turn before the agent stops and asks
+  // you to continue. Raise it for long autonomous runs.
+  "maxSteps": 40,
+
+  // Replace the built-in base prompt entirely. Normally unnecessary —
+  // prefer adding instructions to AGENTS.md.
+  // "systemPrompt": "",
+
+  // Extra instruction files, relative to the project root. AGENTS.md is
+  // discovered automatically; list other files here.
+  // "instructions": ["CONTRIBUTING.md"],
+
+  // Permissions are checked in order and the most specific match wins.
+  // A rule matching tool+pattern beats a tool-only rule; among equally
+  // specific rules the last one wins; `!pattern` negates.
+  // Without a matching rule: read-only tools are allowed, everything else asks.
+  "permissions": [
+    { "tool": "read", "action": "allow" },
+    { "tool": "glob", "action": "allow" },
+    { "tool": "grep", "action": "allow" },
+    { "tool": "list", "action": "allow" },
+    { "tool": "webfetch", "action": "ask" },
+
+    // Narrow, familiar commands should not interrupt you.
+    { "tool": "bash", "pattern": "git status*", "action": "allow" },
+    { "tool": "bash", "pattern": "git diff*", "action": "allow" },
+    { "tool": "bash", "pattern": "npm run test*", "action": "allow" },
+    { "tool": "bash", "pattern": "npm run typecheck*", "action": "allow" },
+
+    // Hard refusals. These are never prompted, not even with --yolo.
+    { "tool": "bash", "pattern": "rm -rf /*", "action": "deny" },
+    { "tool": "bash", "pattern": "git push*", "action": "deny" },
+    { "tool": "bash", "pattern": "git reset --hard*", "action": "deny" },
+
+    { "tool": "bash", "pattern": "*", "action": "ask" },
+    { "tool": "write", "action": "ask" },
+    { "tool": "edit", "action": "ask" }
+  ],
+
+  // Add or override providers. Prefer apiKeyEnv so secrets stay out of
+  // this file. `kortivai auth login <provider>` writes to ~/.kortivai/auth.json.
+  "providers": {
+    "deepseek": { "apiKeyEnv": "DEEPSEEK_API_KEY" },
+    "ollama": { "baseURL": "http://127.0.0.1:11434/v1", "keyless": true },
+    "openrouter": { "apiKeyEnv": "OPENROUTER_API_KEY" }
+  },
+
+  // Model Context Protocol servers. A local server runs as a child process;
+  // a remote one speaks streamable HTTP. `trusted: true` skips the
+  // per-call permission prompt for that server — only do that for servers
+  // you wrote or fully trust.
+  "mcp": {
+    // "filesystem": {
+    //   "type": "local",
+    //   "command": "npx",
+    //   "args": ["-y", "@modelcontextprotocol/server-filesystem", "."]
+    // }
+  },
+
+  // Directories scanned for <name>/SKILL.md. `.kortivai/skills` in the
+  // project is always scanned.
+  "skills": {
+    "disabled": false,
+    "paths": [".kortivai/skills"]
+  },
+
+  // Local ES modules exporting a plugin function, relative to the root.
+  "plugins": [],
+
+  // Add or override agents. `build` and `plan` are built in. Anything you
+  // add here becomes selectable with /agent.
+  "agents": {
+    // "review": {
+    //   "description": "Reviews a diff for correctness and risk, changing nothing.",
+    //   "mode": "primary",
+    //   "prompt": "You review code. Report concrete problems with file and line. You never edit files.",
+    //   "tools": { "write": false, "edit": false, "patch": false }
+    // }
+  },
+
+  // Task-only agents the main agent can delegate to with the `task` tool.
+  "subagents": {
+    // "scout": {
+    //   "description": "Fast read-only reconnaissance of an unfamiliar codebase.",
+    //   "prompt": "You explore codebases and report structure, entry points and conventions concisely."
+    // }
+  },
+
+  // Terminal appearance. theme: "kortiv" | "mono" | "auto".
+  "ui": {
+    "theme": "kortiv",
+    "showReasoning": false,
+    "showTokenUsage": true,
+    "markdown": true,
+    "animations": true
+  }
+}
