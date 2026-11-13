@@ -44,13 +44,23 @@ git clone <your-fork-url> kortivai
 cd kortivai
 npm install
 npm run build
-npm link          # optional: puts `kortivai` on your PATH
+npm link          # puts `kortivai` on your PATH
 ```
 
-Or run the sources directly:
+After `npm link`, typing `kortivai` in any terminal starts the interactive UI —
+the same way `opencode` starts opencode. Because `npm link` points at this
+checkout, re-run `npm run build` after changing the sources and the command
+picks the change up; no relink is needed.
+
+On Windows the linked shim lives in `%APPDATA%\npm`. If `kortivai` is not found,
+that directory is missing from `PATH` — add it and open a new terminal.
+
+Without linking, run it any of these ways:
 
 ```bash
-node src/cli/index.ts --help
+npm run start                     # node dist/cli/index.js
+node src/cli/index.ts --help      # run the TypeScript sources directly
+npx . --help                      # from inside this repo
 ```
 
 ---
@@ -59,11 +69,23 @@ node src/cli/index.ts --help
 
 ### 1. Give it a model
 
-DeepSeek is the default. Export a key (or run `kortivai auth login deepseek`):
+DeepSeek is the default. Store the key once, so every shell and the TUI can use
+it:
+
+```bash
+kortivai auth login deepseek     # prompts; input is hidden, never in shell history
+kortivai auth                    # shows which providers have a credential
+```
+
+Or export it for the current shell only:
 
 ```bash
 export DEEPSEEK_API_KEY=sk-...        # PowerShell: $env:DEEPSEEK_API_KEY="sk-..."
 ```
+
+Keys live in `$KORTIVAI_HOME/auth.json` (mode `0600`), never in the config file
+and never in logs. An environment variable takes precedence over the stored key;
+`kortivai auth list` shows which source is in play.
 
 KortivAI reads `.env` and `.env.local` from your project root as well, so a
 gitignored `.env` works. Existing environment variables always win over a file.

@@ -5,8 +5,8 @@
  * Thin by design: parse, dispatch, map errors. Commands own their output; the
  * entry owns exit codes and the `--help` / `--version` surfaces.
  */
-import { readFileSync } from "node:fs";
-import { pathToFileURL } from "node:url";
+import { readFileSync, realpathSync } from "node:fs";
+import { fileURLToPath } from "node:url";
 import { KortivError, errorChain, errorMessage } from "../util/errors.ts";
 import { parseArgs, type ParsedArgs } from "./args.ts";
 import { createIo, type CliContext, type CliIo } from "./io.ts";
@@ -14,6 +14,7 @@ import { runCommand } from "./cmd/run.ts";
 import { modelsCommand } from "./cmd/models.ts";
 import { sessionsCommand } from "./cmd/sessions.ts";
 import { agentsCommand } from "./cmd/agents.ts";
+import { authCommand } from "./cmd/auth.ts";
 import { initCommand } from "./cmd/init.ts";
 import { tuiCommand } from "./cmd/tui.ts";
 
@@ -75,6 +76,20 @@ const COMMAND_HELP: Record<string, CommandHelp> = {
     options: ["    --force                    overwrite files that already exist"],
     examples: ["kortivai init"],
   },
+  auth: {
+    summary: "Manage API keys stored in auth.json.",
+    usage: "kortivai auth [list | login <provider> | logout <provider>] [--json]",
+    options: [
+      "    --base-url <url>           also store a custom endpoint for this provider",
+      "    --json                     machine-readable output (list only)",
+    ],
+    examples: [
+      "kortivai auth",
+      "kortivai auth login deepseek",
+      "echo $DEEPSEEK_API_KEY | kortivai auth login deepseek",
+      "kortivai auth logout deepseek",
+    ],
+  },
   tui: {
     summary: "Start the interactive terminal UI.",
     usage: "kortivai [tui]",
@@ -116,6 +131,7 @@ export function renderHelp(command?: string): string {
     "  models      Providers, models, context windows, credential status",
     "  sessions    List saved sessions, or remove one",
     "  agents      List the agents available to --agent",
+    "  auth        Manage API keys stored in auth.json",
     "  init        Write kortivai.json and AGENTS.md into this project",
     "  help        Show help for a command",
     "",
@@ -198,6 +214,8 @@ export async function main(argv: string[], io: CliIo = createIo()): Promise<numb
         return await sessionsCommand(ctx);
       case "agents":
         return await agentsCommand(ctx);
+      case "auth":
+        return await authCommand(ctx);
       case "init":
         return await initCommand(ctx);
       case "tui":
@@ -215,7 +233,24 @@ export async function main(argv: string[], io: CliIo = createIo()): Promise<numb
   }
 }
 
-const entry = process.argv[1] ? pathToFileURL(process.argv[1]).href : "";
-if (import.meta.url === entry) {
+/**
+ * True when this module is the process entry point.
+ *
+ * A plain `import.meta.url === pathToFileURL(argv[1])` check fails for linked
+ * installs: `npm link` runs the file through a shim, and Node resolves the
+ * module's real path while `argv[1]` keeps the symlink path, so the comparison
+ * misfires and the CLI exits 0 having done nothing. Compare real paths instead.
+ */
+function isEntryPoint(): boolean {
+  const entry = process.argv[1];
+  if (!entry) return false;
+  try {
+    return realpathSync(fileURLToPath(import.meta.url)) === realpathSync(entry);
+  } catch {
+    return false;
+  }
+}
+
+if (isEntryPoint()) {
   process.exitCode = await main(process.argv.slice(2));
 }
